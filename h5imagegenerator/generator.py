@@ -6,6 +6,7 @@ import h5py as h5
 from keras.utils import Sequence
 from keras.utils import to_categorical
 
+
 from albumentations import Compose
 import numpy as np
 
@@ -106,6 +107,7 @@ class HDF5ImageGenerator(Sequence):
         smooth_factor=0.1,
         augmenter=False,
         mode="train",
+	prep="vgg16"
     ):
 
         if mode not in available_modes:
@@ -146,6 +148,7 @@ class HDF5ImageGenerator(Sequence):
         self.smooth_factor: float = smooth_factor
 
         self._indices = np.arange(self.__get_dataset_shape(self.X_key, 0))
+        self.prep = prep
 
     def __repr__(self):
         """Representation of the class."""
@@ -210,7 +213,7 @@ class HDF5ImageGenerator(Sequence):
             return file[self.X_key].shape[0]
     
     @property 
-    def classes(self) -> List:
+    def classes(self):
         """Grab "human" classes from the dataset.
         
         Returns
@@ -322,6 +325,12 @@ class HDF5ImageGenerator(Sequence):
         """
         # Grab corresponding images from the HDF5 source file.
         batch_X = self.__get_dataset_items(indices, self.X_key)
+        
+        if self.prep:
+            import importlib
+            module = importlib.import_module(f'tensorflow.keras.applications.{self.prep}')
+            func = getattr(module, 'preprocess_input')
+            batch_X = func(batch_X)
 
         # Shall we rescale features?
         if self.scaler:
@@ -346,6 +355,12 @@ class HDF5ImageGenerator(Sequence):
         """
         # Grab samples (tensors, labels) HDF5 source file.
         (batch_X, batch_y) = self.__get_dataset_items(indices)
+        
+        if self.prep:
+            import importlib
+            module = importlib.import_module(f'tensorflow.keras.applications.{self.prep}')
+            func = getattr(module, 'preprocess_input')
+            batch_X = func(batch_X)
 
         # Shall we apply any data augmentation?
         if self.augmenter:
